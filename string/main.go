@@ -1,8 +1,10 @@
 package main
 
 import (
+	"bufio"
 	"errors"
 	"fmt"
+	"os"
 	"strconv"
 	"strings"
 )
@@ -123,9 +125,38 @@ func main() {
 			fmt.Printf("key:%s value:%+v\n", valKey, valVal)
 		}
 	}
-	fmt.Printf("Server - path = %v, (Type: %s) ", m["Server"]["path"].Value, m["Server"]["port"].Type)
+	//fmt.Printf("Server - path = %v, (Type: %s) \n", m["Server"]["path"].Value, m["Server"]["path"].Type)
 
 	/*serverSection := m["Server"]
 	portVal := serverSection["port"]
 	fmt.Printf("type:%s value:%v\n", portVal.Type, portVal.Value)*/
+
+	// 사용자 입력 받기
+	stdin := bufio.NewReader(os.Stdin)
+	for {
+		fmt.Println("Input Section Name: ")
+		var section string
+		_, err := fmt.Scanln(&section)
+		if err != nil {
+			fmt.Println("Input Valid Section")
+
+			stdin.ReadString('\n')
+			continue
+		} else if err == nil {
+			fmt.Println("Input Key Name: ")
+			var key string
+			_, err := fmt.Scanln(&key)
+			if err != nil {
+				fmt.Println("Input Valid Key")
+			} else if err == nil {
+				if len(m[section][key].Value) != 0 {
+					fmt.Printf("%s - %s = %v, (Type: %s) ", section, key, m[section][key].Value, m[section][key].Type)
+					break
+				} else {
+					fmt.Println("Not Exist Value")
+					break
+				}
+			}
+		}
+	}
 }
