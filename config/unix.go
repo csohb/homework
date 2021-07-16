@@ -36,10 +36,14 @@ func (u unixConfig) LoadConfig(File string) error {
 				if str[0] == '[' {
 					// if section is valid
 					if _, err := checkValidSection(str); err == nil {
+						if section != "" {
+							m[section] = kv
+							//fmt.Println(m)
+						}
 						section = str[1 : len(str)-1]
+						kv = make(map[string]interface{})
 					} else {
-						fmt.Println(err)
-						continue
+						return err
 					}
 				}
 				if strings.Contains(str, "=") {
@@ -50,8 +54,8 @@ func (u unixConfig) LoadConfig(File string) error {
 					if _, err := checkValidKey(key); err == nil {
 						if val, err := checkValueType(value); err == nil {
 							kv[key[1:len(key)-1]] = val
-							m[section] = kv
-
+							//fmt.Printf("section=%s\n",section)
+							//fmt.Printf("kv=%s\n",kv)
 						} else {
 							fmt.Println(err)
 						}
@@ -60,6 +64,12 @@ func (u unixConfig) LoadConfig(File string) error {
 						continue
 					}
 				}
+			}
+		}
+		//
+		if len(section) > 0 {
+			if len(kv) > 0 {
+				m[section] = kv
 			}
 		}
 		fmt.Println(m)
@@ -73,6 +83,10 @@ func (u unixConfig) LoadConfig(File string) error {
 func (u unixConfig) GetConfigInteger(section, key string) (int, error) {
 	// if section 존재, key에 해당하는 value 존재할때 -> value를 int로 형 변환하여 return value, nil
 	// error 있으면 _, error
+	// 1. 사용자가 원한 섹션을 가지고 있어?
+	// 2. 사용자가 원하는 섹션에 키를 가지고 있어?
+	// 3. 사용자가 원하는 값의 타입이 맞아?
+
 	val, ok := u.config[section][key].(int)
 	if !ok {
 		return val, fmt.Errorf("Value is not Integer")
