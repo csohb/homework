@@ -12,22 +12,23 @@ type UnixConfigHandler interface {
 	GetConfigString(section, key string) (string, error)
 	GetConfigBoolean(section, key string) (bool, error)
 	LoadConfig(file string) error
+	Printconfig() error
 }
 
 type unixConfig struct {
 	File   string
-	config map[string]map[string]interface{}
+	config map[string]map[string]ValueType
 }
 
 // 여기에서 section, key, value 분류?
-func (u unixConfig) LoadConfig(File string) error {
+func (u *unixConfig) LoadConfig(File string) error {
 	// 1. file check
 	if len(File) != 0 {
 		// 2. file read
 		slice := strings.Split(File, "\n")
 		var section string
-		m := make(map[string]map[string]interface{})
-		kv := make(map[string]interface{})
+		m := make(map[string]map[string]ValueType)
+		kv := make(map[string]ValueType)
 		// 3. data parsing
 		for _, str := range slice {
 			str = strings.TrimSpace(str)
@@ -41,7 +42,7 @@ func (u unixConfig) LoadConfig(File string) error {
 							//fmt.Println(m)
 						}
 						section = str[1 : len(str)-1]
-						kv = make(map[string]interface{})
+						kv = make(map[string]ValueType)
 					} else {
 						return err
 					}
@@ -54,8 +55,6 @@ func (u unixConfig) LoadConfig(File string) error {
 					if _, err := checkValidKey(key); err == nil {
 						if val, err := checkValueType(value); err == nil {
 							kv[key[1:len(key)-1]] = val
-							//fmt.Printf("section=%s\n",section)
-							//fmt.Printf("kv=%s\n",kv)
 						} else {
 							fmt.Println(err)
 						}
@@ -72,7 +71,8 @@ func (u unixConfig) LoadConfig(File string) error {
 				m[section] = kv
 			}
 		}
-		fmt.Println(m)
+		u.config = m
+		fmt.Println(u.config)
 	} else {
 		return fmt.Errorf("config file is empty")
 	}
@@ -80,34 +80,72 @@ func (u unixConfig) LoadConfig(File string) error {
 	return nil
 }
 
-func (u unixConfig) GetConfigInteger(section, key string) (int, error) {
+func (u unixConfig) Printconfig() error {
+	fmt.Println(u.config)
+	return nil
+}
+
+func (u *unixConfig) GetConfigInteger(section, key string) (int, error) {
 	// if section 존재, key에 해당하는 value 존재할때 -> value를 int로 형 변환하여 return value, nil
 	// error 있으면 _, error
 	// 1. 사용자가 원한 섹션을 가지고 있어?
 	// 2. 사용자가 원하는 섹션에 키를 가지고 있어?
 	// 3. 사용자가 원하는 값의 타입이 맞아?
-
-	val, ok := u.config[section][key].(int)
-	if !ok {
-		return val, fmt.Errorf("Value is not Integer")
+	var iVal int
+	kv := u.config[section]
+	if len(kv) > 0 {
+		if len(kv[key].Value) > 0 {
+			if kv[key].Type == "int" {
+				if val, err := strconv.Atoi(kv[key].Value); err == nil {
+					iVal = val
+				}
+			} else {
+				return iVal, errors.New("Value is not int")
+			}
+		}
+	} else {
+		return iVal, errors.New("Section does not exist")
 	}
-	return val, nil
+	return iVal, nil
 }
 
-func (u unixConfig) GetConfigString(section, key string) (string, error) {
-	val, ok := u.config[section][key].(string)
-	if !ok {
-		return val, fmt.Errorf("Value is not String")
+func (u *unixConfig) GetConfigString(section, key string) (string, error) {
+	var sVal string
+	kv := u.config[section]
+	if len(kv) > 0 {
+		if len(kv[key].Value) > 0 {
+			if kv[key].Type == "string" {
+				return sVal, nil
+			} else {
+				return sVal, errors.New("Value is not string")
+			}
+		}
+	} else {
+		return sVal, errors.New("Section does not exist")
 	}
-	return val, nil
+	return sVal, nil
 }
 
-func (u unixConfig) GetConfigBoolean(section, key string) (bool, error) {
-	val, ok := u.config[section][key].(bool)
-	if !ok {
-		return val, fmt.Errorf("Value is not Boolean")
+func (u *unixConfig) GetConfigBoolean(section, key string) (bool, error) {
+	var bVal bool
+	kv := u.config[section]
+	if len(kv) > 0 {
+		if kv[key].Value == "true" || kv[key].Value == "false" {
+			switch kv[key].Value {
+			case "true":
+				bVal = true
+				return bVal, nil
+			case "false":
+				bVal = false
+				return bVal, nil
+			}
+		} else {
+			return bVal, errors.New("Value is not Boolean")
+		}
+	} else {
+		return bVal, errors.New("Section does not exist")
 	}
-	return val, nil
+	return bVal, nil
 }
 
 // 실행 함수
@@ -142,7 +180,7 @@ type ValueType struct {
 }
 
 // value 유효성, 타입 체크
-func checkValueType(value string) (interface{}, error) {
+func checkValueType(value string) (ValueType, error) {
 	if value[0] == '"' {
 		if value[len(value)-1] == '"' {
 			value = value[1 : len(value)-1]
