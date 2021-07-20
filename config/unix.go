@@ -12,13 +12,17 @@ type UnixConfigHandler interface {
 	GetConfigString(section, key string) (string, error)
 	GetConfigBoolean(section, key string) (bool, error)
 	LoadConfig(file string) error
-	Printconfig() error
 }
 
 type unixConfig struct {
 	File   string
-	config map[string]map[string]ValueType
+	config map[string]map[string]interface{}
 }
+
+const (
+	T = true
+	F = false
+)
 
 // 여기에서 section, key, value 분류?
 func (u *unixConfig) LoadConfig(File string) error {
@@ -27,8 +31,8 @@ func (u *unixConfig) LoadConfig(File string) error {
 		// 2. file read
 		slice := strings.Split(File, "\n")
 		var section string
-		m := make(map[string]map[string]ValueType)
-		kv := make(map[string]ValueType)
+		m := make(map[string]map[string]interface{})
+		kv := make(map[string]interface{})
 		// 3. data parsing
 		for _, str := range slice {
 			str = strings.TrimSpace(str)
@@ -42,12 +46,11 @@ func (u *unixConfig) LoadConfig(File string) error {
 							//fmt.Println(m)
 						}
 						section = str[1 : len(str)-1]
-						kv = make(map[string]ValueType)
+						kv = make(map[string]interface{})
 					} else {
 						return err
 					}
-				}
-				if strings.Contains(str, "=") {
+				} else if strings.Contains(str, "=") {
 					// 구분자 index
 					deli := strings.Index(str, "=")
 					key := str[:deli]
@@ -56,10 +59,10 @@ func (u *unixConfig) LoadConfig(File string) error {
 						if val, err := checkValueType(value); err == nil {
 							kv[key[1:len(key)-1]] = val
 						} else {
-							fmt.Println(err)
+							return err
 						}
 					} else {
-						fmt.Println(err)
+						return err
 						continue
 					}
 				}
@@ -76,12 +79,6 @@ func (u *unixConfig) LoadConfig(File string) error {
 	} else {
 		return fmt.Errorf("config file is empty")
 	}
-
-	return nil
-}
-
-func (u unixConfig) Printconfig() error {
-	fmt.Println(u.config)
 	return nil
 }
 
@@ -92,60 +89,56 @@ func (u *unixConfig) GetConfigInteger(section, key string) (int, error) {
 	// 2. 사용자가 원하는 섹션에 키를 가지고 있어?
 	// 3. 사용자가 원하는 값의 타입이 맞아?
 	var iVal int
-	kv := u.config[section]
-	if len(kv) > 0 {
-		if len(kv[key].Value) > 0 {
-			if kv[key].Type == "int" {
-				if val, err := strconv.Atoi(kv[key].Value); err == nil {
-					iVal = val
-				}
-			} else {
+	if kv, has := u.config[section]; has == true {
+		if val, has := kv[key]; has == true {
+			switch val.(type) {
+			case int:
+				iVal = val.(int)
+				return iVal, nil
+			default:
 				return iVal, errors.New("Value is not int")
 			}
+		} else {
+			return iVal, errors.New("This Section has not the key")
 		}
-	} else {
-		return iVal, errors.New("Section does not exist")
 	}
-	return iVal, nil
+	return iVal, errors.New("Section does not exist")
 }
 
 func (u *unixConfig) GetConfigString(section, key string) (string, error) {
 	var sVal string
-	kv := u.config[section]
-	if len(kv) > 0 {
-		if len(kv[key].Value) > 0 {
-			if kv[key].Type == "string" {
+	if kv, has := u.config[section]; has == true {
+		if val, has := kv[key]; has == true {
+			switch val.(type) {
+			case string:
+				sVal = val.(string)
 				return sVal, nil
-			} else {
+			default:
 				return sVal, errors.New("Value is not string")
 			}
+		} else {
+			return sVal, errors.New("This Section has not the key")
 		}
-	} else {
-		return sVal, errors.New("Section does not exist")
 	}
-	return sVal, nil
+	return sVal, errors.New("Section does not exist")
 }
 
 func (u *unixConfig) GetConfigBoolean(section, key string) (bool, error) {
 	var bVal bool
-	kv := u.config[section]
-	if len(kv) > 0 {
-		if kv[key].Value == "true" || kv[key].Value == "false" {
-			switch kv[key].Value {
-			case "true":
-				bVal = true
+	if kv, has := u.config[section]; has == true {
+		if val, has := kv[key]; has == true {
+			switch val.(type) {
+			case bool:
+				bVal = val.(bool)
 				return bVal, nil
-			case "false":
-				bVal = false
-				return bVal, nil
+			default:
+				return bVal, errors.New("Value is not Boolean")
 			}
 		} else {
-			return bVal, errors.New("Value is not Boolean")
+			return bVal, errors.New("This Section has not the key")
 		}
-	} else {
-		return bVal, errors.New("Section does not exist")
 	}
-	return bVal, nil
+	return bVal, errors.New("Section does not exist")
 }
 
 // 실행 함수
@@ -173,26 +166,27 @@ func checkValidKey(key string) (bool, error) {
 	return false, errors.New("Key is not valid")
 }
 
-// value + type 구조체
-type ValueType struct {
-	Value string
-	Type  string
-}
-
 // value 유효성, 타입 체크
-func checkValueType(value string) (ValueType, error) {
+func checkValueType(value string) (interface{}, error) {
 	if value[0] == '"' {
 		if value[len(value)-1] == '"' {
 			value = value[1 : len(value)-1]
-			return ValueType{value, "string"}, nil
+			return value, nil
 		} else {
-			return ValueType{value, "not valid"}, errors.New("Not Valid String")
+			return value, errors.New("Not Valid String")
 		}
 	} else if value == "true" || value == "false" {
-		return ValueType{value, "bool"}, nil
-	} else if _, err := strconv.Atoi(value); err == nil {
-		return ValueType{value, "int"}, nil
+		switch value {
+		case "true":
+			return T, nil
+		case "false":
+			return F, nil
+		default:
+			return value, errors.New("Not Valid Bool")
+		}
+	} else if val, err := strconv.Atoi(value); err == nil {
+		return val, nil
 	} else {
-		return ValueType{value, "not valid"}, errors.New("Not Valid Value")
+		return value, errors.New("Not Valid Value")
 	}
 }
