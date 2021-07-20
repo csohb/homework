@@ -3,6 +3,7 @@ package config
 import (
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"strconv"
 	"strings"
 )
@@ -11,12 +12,20 @@ type UnixConfigHandler interface {
 	GetConfigInteger(section, key string) (int, error)
 	GetConfigString(section, key string) (string, error)
 	GetConfigBoolean(section, key string) (bool, error)
-	LoadConfig(file string) error
+	LoadConfig() error
 }
 
 type unixConfig struct {
-	File   string
-	config map[string]map[string]interface{}
+	Filename string
+	config   map[string]map[string]interface{}
+}
+
+// 실행 함수
+func NewUnixConfig(filename string) UnixConfigHandler {
+	// filename을 받아서 새로운 unixConfig 구조체 인스턴스를 생성하고, 그 생성된 인스턴스의 주소값을 return
+	return &unixConfig{
+		Filename: filename,
+	}
 }
 
 const (
@@ -25,8 +34,13 @@ const (
 )
 
 // 여기에서 section, key, value 분류?
-func (u *unixConfig) LoadConfig(File string) error {
-	// 1. file check
+func (u *unixConfig) LoadConfig() error {
+	// 1. file load
+	con, err := ioutil.ReadFile(u.Filename)
+	if err != nil {
+		panic(err)
+	}
+	File := string(con)
 	if len(File) != 0 {
 		// 2. file read
 		slice := strings.Split(File, "\n")
@@ -139,14 +153,6 @@ func (u *unixConfig) GetConfigBoolean(section, key string) (bool, error) {
 		}
 	}
 	return bVal, errors.New("Section does not exist")
-}
-
-// 실행 함수
-func NewUnixConfig(filename string) UnixConfigHandler {
-	// filename을 받아서 새로운 unixConfig 구조체 인스턴스를 생성하고, 그 생성된 인스턴스의 주소값을 return
-	return &unixConfig{
-		File: filename,
-	}
 }
 
 // section 유효성 체크

@@ -3,23 +3,13 @@ package main
 import (
 	"fmt"
 	"goproject/config"
-	"io/ioutil"
 )
 
 func main() {
 
-	// byte로 파일 읽어옴
-	// 이 처리 자체를 (readFile) NewUnixConfig에서 할 것
-	data, err := ioutil.ReadFile("config.ini")
-	if err != nil {
-		panic(err)
-	}
+	newCon := config.NewUnixConfig("config.ini")
 
-	// byte data 형변환 필요
-	newData := string(data)
-	newCon := config.NewUnixConfig(newData)
-
-	err = newCon.LoadConfig(newData)
+	err := newCon.LoadConfig()
 	if err != nil {
 		panic(err)
 	}
